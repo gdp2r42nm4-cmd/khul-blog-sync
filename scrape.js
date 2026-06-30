@@ -1,42 +1,36 @@
-const fs = require('fs');
-
-const BLOG_URL = 'https://www.khul.co.za/blog';
-const GIST_ID = process.env.GIST_ID;
-const GIST_TOKEN = process.env.GIST_TOKEN;
-
-async function fetchHTML(url) {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; KhulBot/1.0)' }
-  });
-  return res.text();
-}
-
 function extractArticles(html) {
-      const marker = html.indexOf('o_wblog_post');
-  const cardStart = marker > -1 ? marker - 200 : html.indexOf('<body');
-  const cardSample = html.substring(cardStart, cardStart + 4000);
-  console.log('--- CARD SAMPLE START ---');
-  console.log(cardSample);
-  console.log('--- CARD SAMPLE END ---');
-
   const articles = [];
-  const blocks = html.match(/<article[\s\S]*?<\/article>/g) || [];
+  const blocks = html.match(/<article name="blog_post"[\s\S]*?<\/article>/g) || [];
 
   blocks.forEach(block => {
-    const titleMatch = block.match(/<h\d[^>]*class="[^"]*">([\s\S]*?)<\/h\d>/);
-    const linkMatch = block.match(/href="(\/blog\/[^"]+)"/);
-    const imgMatch = block.match(/<img[^>]+src="([^"]+)"/);
-    const dateMatch = block.match(/datetime="([^"]+)"/);
-    const blogNameMatch = block.match(/data-blog-name="([^"]+)"/) || block.match(/class="[^"]*o_blog_post_label[^"]*">([^<]+)</);
+    // Title + URL — first <a> with class o_blog_post_title
+    const titleMatch = block.match(/href="(\/blog\/[^"]+)"[^>]*class="[^"]*o_blog_post_title[^"]*"[^>]*>([\s\S]*?)<\/a>/);
 
-    if (titleMatch && linkMatch) {
+    // Image — background-image url inside style attribute
+    const imgMatch = block.match(/background-image:\s*url\(&#34;([^&]+)&#34;\)/) ||
+                      block.match(/background-image:\s*url\(["']?([^"')]+)["']?\)/);
+
+    // Date — plain text inside <time>
+    const dateMatch = block.match(/<time[^>]*>([^<]+)<\/time>/);
+
+    // Blog category name — text inside the <a> right after fa-folder-open
+    const blogNameMatch = block.match(/fa-folder-open[^<]*<\/i>\s*<a[^>]*>([^<]+)<\/a>/);
+
+    if (titleMatch) {
+      const url = titleMatch[1];
+      const title = titleMatch[2].replace(/<[^>]+>/g, '').trim();
+
+      // Extract blogId from URL slug, e.g. /blog/kmnsports-16/...
+      const slugMatch = url.match(/^\/blog\/[a-z0-9-]+-(\d+)\//);
+      const blogId = slugMatch ? parseInt(slugMatch[1], 10) : null;
+
       articles.push({
-        title: titleMatch[1].replace(/<[^>]+>/g, '').trim(),
-        url: 'https://www.khul.co.za' + linkMatch[1],
-        image: imgMatch ? imgMatch[1] : '',
-        date: dateMatch ? dateMatch[1] : '',
+        title: title,
+        url: 'https://www.khul.co.za' + url,
+        image: imgMatch ? 'https://www.khul.co.za' + imgMatch[1] : '',
+        date: dateMatch ? dateMatch[1].trim() : '',
         blogName: blogNameMatch ? blogNameMatch[1].trim() : '',
-        blogId: null,
+        blogId: blogId,
         excerpt: ''
       });
     }
@@ -44,50 +38,3 @@ function extractArticles(html) {
 
   return articles;
 }
-
-async function updateGist(articles) {
-  const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-    method: 'PATCH',
-    headers: {
-      'Authorization': `token ${GIST_TOKEN}`,
-      'Accept': 'application/vnd.github+json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      files: {
-        'Khulpost.json': {
-          content: JSON.stringify(articles, null, 2)
-        }
-      }
-    })
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Gist update failed: ${res.status} ${err}`);
-  }
-
-  console.log(`Updated gist with ${articles.length} articles`);
-}
-
-async function main() {
-  console.log('Fetching blog page...');
-  const html = await fetchHTML(BLOG_URL);
-
-  console.log('Extracting articles...');
-  const articles = extractArticles(html);
-
-  console.log(`Found ${articles.length} articles`);
-
-  if (articles.length === 0) {
-    console.error('No articles found — aborting to avoid wiping the gist');
-    process.exit(1);
-  }
-
-  await updateGist(articles);
-}
-
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
