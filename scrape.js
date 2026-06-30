@@ -12,11 +12,12 @@ async function fetchHTML(url) {
 }
 
 function extractArticles(html) {
-    const bodyStart = html.indexOf('<body');
-  const bodySample = html.substring(bodyStart, bodyStart + 4000);
-  console.log('--- BODY SAMPLE START ---');
-  console.log(bodySample);
-  console.log('--- BODY SAMPLE END ---');
+      const marker = html.indexOf('o_wblog_post');
+  const cardStart = marker > -1 ? marker - 200 : html.indexOf('<body');
+  const cardSample = html.substring(cardStart, cardStart + 4000);
+  console.log('--- CARD SAMPLE START ---');
+  console.log(cardSample);
+  console.log('--- CARD SAMPLE END ---');
 
   const articles = [];
   const blocks = html.match(/<article[\s\S]*?<\/article>/g) || [];
