@@ -12,9 +12,11 @@ async function fetchHTML(url) {
 }
 
 function extractArticles(html) {
-  console.log('--- HTML SAMPLE START ---');
-  console.log(html.substring(0, 3000));
-  console.log('--- HTML SAMPLE END ---');
+    const bodyStart = html.indexOf('<body');
+  const bodySample = html.substring(bodyStart, bodyStart + 4000);
+  console.log('--- BODY SAMPLE START ---');
+  console.log(bodySample);
+  console.log('--- BODY SAMPLE END ---');
 
   const articles = [];
   const blocks = html.match(/<article[\s\S]*?<\/article>/g) || [];
