@@ -12,21 +12,11 @@ async function fetchHTML(url) {
 }
 
 function extractArticles(html) {
-  const articles = [];
-  function extractArticles(html) {
   console.log('--- HTML SAMPLE START ---');
   console.log(html.substring(0, 3000));
   console.log('--- HTML SAMPLE END ---');
 
   const articles = [];
-
-  // Match each blog post card block in Odoo's default blog listing
-  const cardRegex = /<a[^>]+href="(\/blog\/[^"]+)"[^>]*class="[^"]*o_blog_post_link[^"]*"[\s\S]*?<\/a>/g;
-
-  // Fallback broader regex — captures title, link, image, date, blog name
-  const postRegex = /<div[^>]+class="[^"]*oe_blog_post[^"]*"[\s\S]*?<\/div>\s*<\/div>/g;
-
-  let match;
   const blocks = html.match(/<article[\s\S]*?<\/article>/g) || [];
 
   blocks.forEach(block => {
