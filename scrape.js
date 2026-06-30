@@ -47,6 +47,44 @@ function extractArticles(html) {
   return articles;
 }
 
+async function fetchAllArticles() {
+  let allArticles = [];
+  let page = 1;
+  const seenUrls = new Set();
+
+  while (true) {
+    const url = page === 1 ? BLOG_URL : `${BLOG_URL}/page/${page}`;
+    console.log(`Fetching page ${page}: ${url}`);
+
+    const html = await fetchHTML(url);
+    const pageArticles = extractArticles(html);
+
+    if (pageArticles.length === 0) {
+      console.log(`Page ${page} returned 0 articles — stopping`);
+      break;
+    }
+
+    const newOnes = pageArticles.filter(a => !seenUrls.has(a.url));
+    if (newOnes.length === 0) {
+      console.log(`Page ${page} had no new articles — stopping`);
+      break;
+    }
+
+    newOnes.forEach(a => seenUrls.add(a.url));
+    allArticles = allArticles.concat(newOnes);
+    console.log(`Page ${page}: found ${pageArticles.length} articles (${newOnes.length} new). Total so far: ${allArticles.length}`);
+
+    page++;
+
+    if (page > 50) {
+      console.log('Hit safety cap of 50 pages — stopping');
+      break;
+    }
+  }
+
+  return allArticles;
+}
+
 async function updateGist(articles) {
   const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
     method: 'PATCH',
@@ -78,13 +116,10 @@ async function updateGist(articles) {
 }
 
 async function main() {
-  console.log('Fetching blog page...');
-  const html = await fetchHTML(BLOG_URL);
+  console.log('Fetching all blog pages...');
+  const articles = await fetchAllArticles();
 
-  console.log('Extracting articles...');
-  const articles = extractArticles(html);
-
-  console.log(`Found ${articles.length} articles`);
+  console.log(`Found ${articles.length} total articles across all pages`);
 
   if (articles.length === 0) {
     console.error('No articles found — aborting to avoid wiping the gist');
